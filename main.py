@@ -3,11 +3,11 @@ import pytesseract as pt
 from PIL import Image
 import numpy as np
 
-pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
+pt.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 print(pt.get_languages())
 img = cv2.imread('carta2.jpeg')
 cv2.resize(img, None, fx=0.3, fy=0.3)
-# img = img[::-1,::-1] inverted img
+# img = img[::-1,::-1] # inverted img
 # cv2.namedWindow("Img", cv2.WINDOW_KEEPRATIO)
 
 src_pts = []
@@ -40,7 +40,7 @@ transformation_matrix = cv2.getPerspectiveTransform(original_corners, output_cor
 # Apply the perspective transformation
 warped_image = cv2.warpPerspective(img, transformation_matrix,(output_width, output_height))
 
-cv2.imshow('img', img)
+cv2.imshow('img', warped_image)
 cv2.waitKey(0)
-text = pt.image_to_string(img, lang='ita')
+text = pt.image_to_string(warped_image, lang='ita')
 print(text)
