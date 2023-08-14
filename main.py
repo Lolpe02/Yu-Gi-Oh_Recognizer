@@ -3,7 +3,7 @@ import pytesseract as pt
 from PIL import Image
 import numpy as np
 
-pt.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 print(pt.get_languages())
 img = cv2.imread('carta2.jpeg')
 cv2.resize(img, None, fx=0.3, fy=0.3)
@@ -17,7 +17,7 @@ def onClick(event,x,y,flags,param):
         if len(src_pts) <4:
             src_pts.append([x,y])
             a = cv2.circle(img.copy(), (x,y), 10, (0,0,255), -1)
-            a = cv2.addText(a, corners[len(src_pts)])
+            cv2.addText(a, corners[len(src_pts)-1], (50, 100), cv2.FONT_HERSHEY_SIMPLEX, (0, 0, 255), 2)
             cv2.imshow("Img", a)
 
 # homogenous trasform
