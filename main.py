@@ -28,7 +28,7 @@ def onClick(event,x,y,flags,param):
         cv2.imshow("Img", put)
 
 # points for 0.5 scale [[181, 306], [426, 370], [341, 730], [82, 664]]
-# points for 1 scale [[362, 612], [852, 740],[682, 1460],[164, 1328]]
+# points for 1 scale   [[362, 612], [852, 740],[682, 1460],[164, 1328]]
 
 # homogenous trasform
 # cv2.imshow("Img",img )
@@ -42,13 +42,12 @@ original_corners = np.array([[362, 612], [852, 740],[682, 1460],[164, 1328]], dt
 # sobely = cv2.Sobel(gray,cv2.CV_64F,0,1,ksize=5)
 # sobel = cv2.addWeighted(sobelx,0.5,sobely,0.5,0)
 
-# detect corners
+# detect corners with new algorithm
 # corners = cv2.goodFeaturesToTrack(gray,15,qualityLevel=0.9,minDistance=
 # 80, mask=None, blockSize= 10, gradientSize= 1, useHarrisDetector= True, k=0.0004)
 # if corners is None:
 #     print("no corners found")
 #     exit()
-
 # Draw corners on the original image
 # for corner in corners:
 #     x, y = corner.ravel()
