@@ -7,7 +7,7 @@ import numpy as np
 pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 print(pt.get_languages())
 img = cv2.imread('carta2.jpeg')
-print(np.linspace(-1,11))
+# print(np.linspace(-1,11))
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 # img = cv2.GaussianBlur(img, (9,9),0)s
 # img = img[::-1,::-1] # inverted img
@@ -73,8 +73,8 @@ warped_image = cv2.warpPerspective(img, transformation_matrix,(output_width, out
 # cv2.imshow("corners2", img)
 # cv2.waitKey(0)
 
-# cv2.imshow('img', warped_image)
-# cv2.waitKey(0)
-# text = pt.image_to_string(warped_image, lang='ita')
+cv2.imshow('img', warped_image)
+cv2.waitKey(0)
+text = pt.image_to_string(warped_image, lang='ita')
 # print(text)
 # print("tibo can u see this?")
