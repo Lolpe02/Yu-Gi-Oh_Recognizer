@@ -89,13 +89,13 @@ dilation = cv2.dilate(thresh_H + thresh_S, kernel, iterations = 1)
 cv2.imshow('dilation', dilation)
 
 #--- find contours on the result above ---
-(contours, hierarchy) = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+(contours, hierarchy) = cv2.findContours(dilation, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+print()
 #--- since there were few small contours found, retain those above a certain area ---
 im2 = img.copy()
 count = 0
 for c in contours:
-    if cv2.contourArea(c) > 50:
+    if cv2.contourArea(c) > 50 and cv2.contourArea(c) < np.multiply(img.shape[0],img.shape[1])-1:
         count+=1
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
 
