@@ -2,31 +2,52 @@ import cv2
 import pytesseract as pt
 from PIL import Image
 import numpy as np
+import Perfect_Rotation as pr
 # import nltk
 
 pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 print(pt.get_languages())
-img = cv2.imread('carta4.jpeg')
+namelist =[]
+kernel = np.ones((3,3), np.uint8)
+img = cv2.imread('carta6.jpeg')
 img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
-# img = cv2.GaussianBlur(img, (3,3),0.5)
+blur_img = cv2.GaussianBlur(img, (3,3),0)
 
-edges = cv2.Canny(img, 300, 400)
-contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+edges = cv2.Canny(blur_img, 100, 400)
+# edges = cv2.dilate(edges, kernel, iterations= 1)
+cv2.imshow("edges", edges)
+contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 im2 = img.copy()
 count = 0
-output_width = 590 // 2
-output_height = 860 // 2
-output_corners = np.float32([[0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1], [0, output_height - 1]])
+# Define the dimensions of the output image (width, height)
+output_width = 590 //2
+output_height = 860 //2
+# bottom_left, top_left, top_right, bottom_right
+output_corners = np.float32([[0, output_height - 1], [0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1] ])
 for c in contours:
     if cv2.contourArea(c) > 650:
 
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
-        points = np.array(cv2.boxPoints(cv2.minAreaRect(c)), dtype=np.float32)
-        # cv2.rectangle(im2, (x, y), (x + w, y + h), (0, 0, 255), 2)
+        HL, LR, alpha = cv2.minAreaRect(c)
+        print(alpha)
+        # always anti-clockwise starting from lowest corner
+        box = cv2.boxPoints((HL, LR, alpha))
+        box = np.array(box, dtype=np.float32)
+        a = 0
+        for p in box:
+
+            cv2.circle(im2, p.astype(int), 5,(a *63,a * 63,a * 63), -1)
+            a += 1
+
+
         count+=1
-        transformation_matrix = cv2.getPerspectiveTransform(points, output_corners)
+        transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
         warped_image = cv2.warpPerspective(img.copy(), transformation_matrix, (output_width, output_height))
-        cv2.imshow(f"contours of {count}", warped_image)
+
+        text = pt.image_to_string(warped_image, lang='ita')
+        print(text)
+        cv2.imshow(f"contours of {count}",im2)
+
 # cv2.imshow("contours", im2)
 # im2 = img.copy()
 # lines = cv2.HoughLines(edges, 1, np.pi/180, 100)
@@ -78,9 +99,8 @@ gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 # # sobely = cv2.Sobel(gray,cv2.CV_64F,0,1,ksize=5)
 # # sobel = cv2.addWeighted(sobelx,0.5,sobely,0.5,0)
 
-# # Define the dimensions of the output image (width, height)
-output_width = 590
-output_height = 860
+
+
 #
 # Define the coordinates of the corresponding corners in the output image
 # output_corners = np.float32([[0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1], [0, output_height - 1]])
@@ -102,17 +122,17 @@ hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 # cv2.imshow('S', hsv[:,:,1])
 #
 # #--- find Otsu threshold on hue and saturation channel ---
-ret, thresh_H = cv2.threshold(hsv[:,:,0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-ret, thresh_S = cv2.threshold(hsv[:,:,1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+# ret, thresh_H = cv2.threshold(hsv[:,:,0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+# ret, thresh_S = cv2.threshold(hsv[:,:,1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 #
 # #--- add the result of the above two ---
 # cv2.imshow('thresh', thresh_H + thresh_S)
 #
 # #--- some morphology operation to clear unwanted spots ---
-kernel = np.zeros((3,3), np.uint8)
-neg = cv2.bitwise_not(thresh_H + thresh_S)
+
+# neg = cv2.bitwise_not(thresh_H + thresh_S)
 # cv2.imshow('neg', thresh_H + thresh_S)
-dilation = cv2.dilate(neg, kernel, iterations= 1)
+
 # cv2.imshow('dilation+bitwise not', dilation)
 #
 # #--- find contours on the result above ---
