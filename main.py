@@ -9,11 +9,12 @@ pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 print(pt.get_languages())
 namelist =[]
 kernel = np.ones((3,3), np.uint8)
-img = cv2.imread('carta6.jpeg')
+img = cv2.imread('carta5.jpeg')
+#TODO: try HSV thresholding Canny edge detection
 img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 blur_img = cv2.GaussianBlur(img, (3,3),0)
 
-edges = cv2.Canny(blur_img, 100, 400)
+edges = cv2.Canny(blur_img, 100, 300)
 # edges = cv2.dilate(edges, kernel, iterations= 1)
 cv2.imshow("edges", edges)
 contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -22,23 +23,26 @@ count = 0
 # Define the dimensions of the output image (width, height)
 output_width = 590 //2
 output_height = 860 //2
-# bottom_left, top_left, top_right, bottom_right
-output_corners = np.float32([[0, output_height - 1], [0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1] ])
+# top_left, top_right, bottom_right, bottom_left
+output_corners = np.float32([[0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1], [0, output_height - 1]])
 for c in contours:
     if cv2.contourArea(c) > 650:
 
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
         HL, LR, alpha = cv2.minAreaRect(c)
         print(alpha)
-        # always anti-clockwise starting from lowest corner
+        # always clockwise starting from the top left
         box = cv2.boxPoints((HL, LR, alpha))
         box = np.array(box, dtype=np.float32)
         a = 0
         for p in box:
-
+            print(p)
             cv2.circle(im2, p.astype(int), 5,(a *63,a * 63,a * 63), -1)
             a += 1
-
+        box
+        #TODO: check if the box is clockwise or not and trsform as needed
+        if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
+            9 #box = np.concatenate(box[-1] + box[:-1])
 
         count+=1
         transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
@@ -46,7 +50,7 @@ for c in contours:
 
         text = pt.image_to_string(warped_image, lang='ita')
         print(text)
-        cv2.imshow(f"contours of {count}",im2)
+        cv2.imshow(f"contours of {count}",warped_image)
 
 # cv2.imshow("contours", im2)
 # im2 = img.copy()
