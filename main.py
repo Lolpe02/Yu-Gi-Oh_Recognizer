@@ -5,11 +5,24 @@ import numpy as np
 import Perfect_Rotation as pr
 # import nltk
 
+def is_rectangle(contour):
+    # Calculate contour properties
+    perimeter = cv2.arcLength(contour, True)
+    vertices = cv2.approxPolyDP(contour, 0.01 * perimeter, True)
+    # print(vertices)
+    x, y, width, height = cv2.boundingRect(vertices)
+    card_ratio = 590 / 860
+    # Calculate aspect ratio of the bounding rectangle
+    aspect_ratio = width / height
+
+    # Check if the contour has 4 vertices and aspect ratio close to 1
+    return len(vertices) == 4 and aspect_ratio >= card_ratio - 0.3 and aspect_ratio <= card_ratio + 0.2
+
 pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 print(pt.get_languages())
 namelist =[]
 kernel = np.ones((3,3), np.uint8)
-img = cv2.imread('carta5.jpeg')
+img = cv2.imread('carta3.jpeg')
 #TODO: try HSV thresholding Canny edge detection
 img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 blur_img = cv2.GaussianBlur(img, (3,3),0)
@@ -26,17 +39,17 @@ output_height = 860 //2
 # top_left, top_right, bottom_right, bottom_left
 output_corners = np.float32([[0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1], [0, output_height - 1]])
 for c in contours:
-    if cv2.contourArea(c) > 650:
+    if cv2.contourArea(c) > 300 and is_rectangle(c):
 
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
         HL, LR, alpha = cv2.minAreaRect(c)
-        print(alpha)
+        # print(alpha)
         # always clockwise starting from the top left
         box = cv2.boxPoints((HL, LR, alpha))
         box = np.array(box, dtype=np.float32)
         a = 0
         for p in box:
-            print(p)
+            # print(p)
             cv2.circle(im2, p.astype(int), 5,(a *63,a * 63,a * 63), -1)
             a += 1
         box
@@ -50,7 +63,9 @@ for c in contours:
 
         text = pt.image_to_string(warped_image, lang='ita')
         print(text)
-        cv2.imshow(f"contours of {count}",warped_image)
+        cv2.imshow(f"contours of {count}",im2)
+
+
 
 # cv2.imshow("contours", im2)
 # im2 = img.copy()
@@ -97,7 +112,7 @@ for c in contours:
 # # cv2.waitKey(0)
 # original_corners = np.array([[362, 612], [852, 740],[682, 1460],[164, 1328]], dtype=np.float32)
 # # print(src_pts)
-gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 #
 # # sobelx = cv2.Sobel(gray,cv2.CV_64F,1,0,ksize=5)
 # # sobely = cv2.Sobel(gray,cv2.CV_64F,0,1,ksize=5)
