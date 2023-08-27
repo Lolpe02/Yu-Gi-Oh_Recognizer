@@ -53,8 +53,11 @@ def find_optimal_canny_threshold(im, max_edge_count, threshold_range=(0, 500), s
     for threshold1 in range(threshold_range[0], threshold_range[1] - 1, step):
         for threshold2 in range(threshold1+ step, threshold_range[1], step):
             edges = cv2.Canny(image, threshold1, threshold2, None, 3, True)
-            edges = cv2.rectangle(edges, (50, 50), (600, 300), (255, 255, 255), -1, 8)
-            edges = cv2.putText(edges, "t1= " + str(threshold1) + ", t2= " + str(threshold2) + "\n press q to quit\npress enter to fuck", (80, 90),
+            edges = cv2.rectangle(edges, (50, 50), (1100, 150), (255, 255, 255), -1, 8)
+            edges = cv2.putText(edges, f"t1= {threshold1} , t2= {threshold2}", (80, 90),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 6)
+            edges = cv2.putText(edges, f"q = quit, enter = try, any key = next",
+                                (80, 130),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 6)
             cv2.imshow("edges", cv2.resize(edges, None, fx=0.45, fy=0.45, interpolation=cv2.INTER_CUBIC))
 
