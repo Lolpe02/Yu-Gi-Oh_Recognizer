@@ -1,70 +1,51 @@
 import cv2
 import pytesseract as pt
-from PIL import Image
+# from PIL import Image
 import numpy as np
-import Perfect_Rotation as pr
+# import Perfect_Rotation as pr
 # import nltk
 
 def is_rectangle(contour):
-    # Calculate contour properties
     perimeter = cv2.arcLength(contour, True)
     vertices = cv2.approxPolyDP(contour, 0.01 * perimeter, True)
-    # print(vertices)
-    x, y, width, height = cv2.boundingRect(vertices)
-    card_ratio = 590 / 860
-    # Calculate aspect ratio of the bounding rectangle
-    aspect_ratio = width / height
+    return len(vertices) == 4
 
-    # Check if the contour has 4 vertices and aspect ratio close to 1
-    return len(vertices) == 4 and aspect_ratio >= card_ratio - 0.3 and aspect_ratio <= card_ratio + 0.2
-
-pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
-print(pt.get_languages())
-namelist =[]
-kernel = np.ones((3,3), np.uint8)
-img = cv2.imread('carta3.jpeg')
-#TODO: try HSV thresholding Canny edge detection
-img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
-blur_img = cv2.GaussianBlur(img, (3,3),0)
-
-edges = cv2.Canny(blur_img, 100, 300)
-# edges = cv2.dilate(edges, kernel, iterations= 1)
-cv2.imshow("edges", edges)
-contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-im2 = img.copy()
-count = 0
 # Define the dimensions of the output image (width, height)
-output_width = 590 //2
-output_height = 860 //2
-# top_left, top_right, bottom_right, bottom_left
-output_corners = np.float32([[0, 0], [output_width - 1, 0], [output_width - 1, output_height - 1], [0, output_height - 1]])
+output_width = 590 #// 2
+output_height = 860 #// 2
+
+pt.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# print(pt.get_languages())
+img = cv2.imread('carta3.jpeg')
+# img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
+# bilateralFilter keeps edges sharp while blurring the rest
+blur = cv2.bilateralFilter(img, 9, 75, 75)
+edges = cv2.Canny(blur, 100, 300)
+cv2.imshow("edges", edges)
+contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+# top_right, top_left, bottom_left, bottom_right
+output_corners = np.float32([[output_width - 1, 0], [0, 0], [0, output_height - 1], [output_width - 1, output_height - 1]])
+count = 0
 for c in contours:
     if cv2.contourArea(c) > 300 and is_rectangle(c):
-
+        im2 = img.copy()
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
-        HL, LR, alpha = cv2.minAreaRect(c)
-        # print(alpha)
-        # always clockwise starting from the top left
-        box = cv2.boxPoints((HL, LR, alpha))
-        box = np.array(box, dtype=np.float32)
-        a = 0
-        for p in box:
-            # print(p)
+        vertices = cv2.approxPolyDP(c, 0.01 * cv2.arcLength(c, True), True)
+        vertices = np.array(vertices, np.float32).reshape(4, 2)
+        for a, p in enumerate(vertices):
             cv2.circle(im2, p.astype(int), 5,(a *63,a * 63,a * 63), -1)
-            a += 1
-        box
         #TODO: check if the box is clockwise or not and trsform as needed
-        if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
-            9 #box = np.concatenate(box[-1] + box[:-1])
+        # if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
+        #      box = np.concatenate(box[-1] + box[:-1])
 
-        count+=1
-        transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
-        warped_image = cv2.warpPerspective(img.copy(), transformation_matrix, (output_width, output_height))
-
-        text = pt.image_to_string(warped_image, lang='ita')
+        count += 1
+        transformation_matrix = cv2.getPerspectiveTransform(vertices, output_corners)
+        warped_img = cv2.warpPerspective(im2, transformation_matrix, (output_width, output_height))
+        text = pt.image_to_string(warped_img, lang='ita', config=' --psm 4')
         print(text)
-        cv2.imshow(f"contours of {count}",im2)
-
+        cv2.imshow(f"contour {count}", warped_img)
+cv2.waitKey(0)
 
 
 # cv2.imshow("contours", im2)
@@ -132,7 +113,7 @@ for c in contours:
 #
 #
 # #--- convert the image to HSV color space ---
-hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+# hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 # # find hsv of points
 # # for point in [[191, 319], [128, 666], [360, 620], [401, 442]]:
 # #     print(hsv[point[1],point[0]]) #why not [point[0],point[1]]? because opencv is BGR not RGB
@@ -176,7 +157,6 @@ hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 #
 # cv2.imshow('cards_output', im2)
 # print('There are {} cards'.format(count))
-cv2.waitKey(0)
 #
 # # cv2.imshow('img', warped_image)
 # # cv2.waitKey(0)
