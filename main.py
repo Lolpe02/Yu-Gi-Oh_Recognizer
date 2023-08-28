@@ -10,20 +10,30 @@ import Param_Tuning as pmt
 pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 # print(pt.get_languages())
 namelist = []
-kernel = np.ones((3, 3), np.uint8)
-img = cv2.imread('carta11.jpeg')
+kernel = np.ones((5, 5), np.uint8)
+img = cv2.imread('carta5.jpeg')
 # TODO: try HSV thresholding Canny edge detection
 
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
-blur_img = cv2.GaussianBlur(img, (3, 3), 0)
-ret, thresh = cv2.threshold(cv2.cvtColor(blur_img, cv2.COLOR_BGR2GRAY), 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+img = cv2.GaussianBlur(img, (3, 3), 0.1)
+blur_img = cv2.bilateralFilter(img, 9, 10, 10)
+hsv = cv2.cvtColor(blur_img, cv2.COLOR_BGR2HSV)
+ret, thresh_H = cv2.threshold(hsv[:,:,0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+ret, thresh_S = cv2.threshold(hsv[:,:,1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-edges1 = cv2.Canny(blur_img, 100, 300)  # , None, 3, True #(140, 481, False)
-# edges2 = cv2.Canny(blur_img, 300, 500)
+#--- add the result of the above two ---
+cv2.imshow('thresh', thresh_H + thresh_S)
+
+neg = cv2.bitwise_not(thresh_H + thresh_S)
+#--- some morphology operation to clear unwanted spots ---
+dilation = cv2.dilate(neg, kernel, iterations=1)
+edges1 = cv2.Canny(dilation, 120, 400)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
+# edges2 = cv2.Canny(blur_img, 300, 500)g
 cv2.imshow("edges1", cv2.resize(edges1, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 # cv2.imshow("edges2", cv2.resize(edges2, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 # cv2.waitKey(0)
 contours, hierarchy = cv2.findContours(edges1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# print(len(contours))
 if contours is None:
     print("no contours found")
     exit()
@@ -37,10 +47,10 @@ output_height = 860
 output_corners = np.float32([[0, 0], [output_width, 0], [output_width, output_height], [0, output_height]])
 
 for c in contours:
-    if cv2.contourArea(c) > 350 and pmt.is_rectangle(c):  #
+    if cv2.contourArea(c) > 450 and pmt.is_rectangle(c):#:
         print("found a rectangle")
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
-        HL, LR, alpha = cv2.minAreaRect(c)
+        # HL, LR, alpha = cv2.minAreaRect(c)
         # always clockwise starting from the top left
         tl, tr, br, bl = pmt.find_corner_points(c)
         box = np.array([tl, tr, br, bl], dtype=np.float32).reshape(4, 2)
@@ -52,9 +62,9 @@ for c in contours:
             a += 1
 
         # TODO: check if the box is clockwise or not and trasform as needed
-        if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
-            print("ordering")
-            box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
+        # if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
+        #     print("ordering")
+        #     box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
 
         count += 1
         transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
@@ -63,8 +73,8 @@ for c in contours:
         # name = warped_image[x//16:x//7,y//12:y*33//40]
         name = warped_image[:x // 7, :]
         # sharpening with blur and kernel
-        blurred = cv2.GaussianBlur(name, (3, 3), 0)
-        name = cv2.addWeighted(name, 1.5, blurred, -0.5, 0)
+        # blurred = cv2.GaussianBlur(name, (3, 3), 0)
+        # name = cv2.addWeighted(name, 1.5, blurred, -0.5, 0)
 
         # kernel = np.array([[1, -1, -1], [0, 5, -1], [1, -1,-1]])
         # warped_image = cv2.filter2D(warped_image, -1, kernel)
@@ -75,8 +85,8 @@ for c in contours:
         cv2.imshow(f"name of {count}", name)
 
     else:
-        # cv2.drawContours(im2, [c], -1, (0,0,255), 8)
-        # print("smt wrongobongo")
+        cv2.drawContours(im2, [c], -1, (0,0,255), 8)
+        print("smt wrongobongo")
         failed += 1
 
 im2 = cv2.resize(im2, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
