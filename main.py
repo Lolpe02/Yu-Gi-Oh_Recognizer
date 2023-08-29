@@ -11,7 +11,7 @@ pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 # print(pt.get_languages())
 namelist = []
 kernel = np.ones((2,2), np.uint8)
-img = cv2.imread('carta1.jpeg')
+img = cv2.imread('carta2.jpeg')
 # print(img.shape)
 
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
@@ -54,18 +54,18 @@ output_width, output_height = 590, 860
 output_corners = np.float32([[0, 0], [output_width, 0], [output_width, output_height], [0, output_height]])
 
 for c in contours:
-    if cv2.contourArea(c) > 500:#: and pmt.is_rectangle(c)
+    if cv2.contourArea(c) > 1800:#: and pmt.is_rectangle(c)
         print("found a rectangle")
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
         # HL, LR, alpha = cv2.minAreaRect(c)
         # always clockwise starting from the top left tl, tr, br, bl
 
-        # box = pmt.find_corner_points(c).astype(np.float32)
+        box = pmt.find_corner_points(c).astype(np.float32)
         a = 0
         vertices = cv2.approxPolyDP(c, 0.3 * cv2.arcLength(c, True), True)
         print(vertices)
         # vertices.reshape(4, 2)
-        for p in vertices.astype(np.int32):
+        for p in box.astype(np.int32):
             print(p)
             im2 = cv2.circle(im2, p, 5, (a * 63, a * 63, a * 63), -1)
             im2 = cv2.putText(im2, str(a) + str(p), p, cv2.FONT_HERSHEY_SIMPLEX, 1.6, (a * 63, a * 63, a * 63), 6)
@@ -73,14 +73,14 @@ for c in contours:
 
         # TODO: check if the box is clockwise or not and trasform as needed
 
-        # if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
-        #     print(box[1, 0] - box[0, 0], box[2, 1] - box[1, 1])
-        #     box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
-        #     print("ordering\n"+str(box))
+        if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
+            print(box[1, 0] - box[0, 0], box[2, 1] - box[1, 1])
+            box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
+            print("ordering\n"+str(box))
 
 
         count += 1
-        transformation_matrix = cv2.getPerspectiveTransform(vertices, output_corners)
+        transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
         warped_image = cv2.warpPerspective(img.copy(), transformation_matrix, (output_width, output_height))
         x, y = warped_image.shape[:2]
         # name = warped_image[x//16:x//7,y//12:y*33//40]
@@ -95,7 +95,7 @@ for c in contours:
         # warped_image = cv2.resize(warped_image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
         text = pt.image_to_string(name, lang='ita')
         print(text)
-        cv2.imshow(f"name of {count}", cv2.resize(warped_image, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+        cv2.imshow(f"name of {count}", cv2.resize(name, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
     else:
         # cv2.drawContours(im2, [c], -1, (0,0,255), 8)
