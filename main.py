@@ -12,29 +12,34 @@ pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 namelist = []
 kernel = np.ones((2,2), np.uint8)
 img = cv2.imread('carta2.jpeg')
+blur_img = cv2.bilateralFilter(img, 9, 10, 10)
 # print(img.shape)
+def hsv_thresh(img):
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    ret, thresh_H = cv2.threshold(hsv[:, :, 0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ret, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ret, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # --- add the result of the above two ---
+
+    t = -thresh_V - thresh_H - thresh_S
+    neg = cv2.bitwise_not(t)
+    # cv2.imshow('threshsum', cv2.resize(neg, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+
+    # --- some morphology operation to clear unwanted spots ---
+    dilation = cv2.dilate(neg, kernel, iterations=5)
+    # add 3 axis to the 2d array
+
+    stacked = np.dstack((thresh_H, thresh_S, thresh_V))
+    rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2RGB)
+    return rgbstacked, dilation, img
 
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 # img = cv2.GaussianBlur(img, (3, 3), 0.1)
-blur_img = cv2.bilateralFilter(img, 9, 10, 10)
-hsv = cv2.cvtColor(blur_img, cv2.COLOR_BGR2HSV)
-ret, thresh_H = cv2.threshold(hsv[:,:,0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-ret, thresh_S = cv2.threshold(hsv[:,:,1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-ret, thresh_V = cv2.threshold(hsv[:,:,2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-#--- add the result of the above two ---
 
-t = -thresh_V - thresh_H - thresh_S
-neg = cv2.bitwise_not(t)
-# cv2.imshow('threshsum', cv2.resize(neg, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
-#--- some morphology operation to clear unwanted spots ---
-dilation = cv2.dilate(neg, kernel, iterations=5)
-#add 3 axis to the 2d array
 
-stacked = np.dstack((thresh_H ,thresh_S,thresh_V))
-rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2RGB)
-canny = cv2.Canny(rgbstacked, 0, 700)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
+canny = cv2.Canny(hsv_thresh(), 0, 700)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
 # edges2 = cv2.Canny(neg, 500, 600)
 new = cv2.dilate(canny, kernel, iterations=4)
 cv2.imshow("canny", cv2.resize(new, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
