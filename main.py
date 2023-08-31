@@ -11,8 +11,8 @@ pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 # print(pt.get_languages())
 namelist = []
 kernel = np.ones((2,2), np.uint8)
-img = cv2.imread('carta2.jpeg')
-blur_img = cv2.bilateralFilter(img, 9, 10, 10)
+img = cv2.imread('carta1.jpeg')
+blur_img = cv2.bilateralFilter(img, 3, 10, 10)
 # print(img.shape)
 def hsv_thresh(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -21,7 +21,7 @@ def hsv_thresh(img):
     ret, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     # --- add the result of the above two ---
 
-    t = -thresh_V - thresh_H - thresh_S
+    t =  thresh_V- thresh_H + thresh_S
     neg = cv2.bitwise_not(t)
     # cv2.imshow('threshsum', cv2.resize(neg, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
@@ -30,8 +30,8 @@ def hsv_thresh(img):
     # add 3 axis to the 2d array
 
     stacked = np.dstack((thresh_H, thresh_S, thresh_V))
-    rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2RGB)
-    return rgbstacked, dilation, img
+    rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2BGR)
+    return rgbstacked, dilation, t
 
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 # img = cv2.GaussianBlur(img, (3, 3), 0.1)
@@ -39,12 +39,16 @@ def hsv_thresh(img):
 
 
 
-canny = cv2.Canny(hsv_thresh(), 0, 700)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
+canny = cv2.Canny(hsv_thresh(blur_img)[1], 200, 300)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
 # edges2 = cv2.Canny(neg, 500, 600)
-new = cv2.dilate(canny, kernel, iterations=4)
-cv2.imshow("canny", cv2.resize(new, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+new = cv2.dilate(canny, kernel, iterations=3)
+# cv2.imshow("canny", cv2.resize(canny, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+cv2.imshow("dilatedcanny", cv2.resize(new, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 # cv2.imshow("c2", cv2.resize(edges2, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-# cv2.waitKey(0)
+test = cv2.waitKey(0) & 0xFF
+if test == ord("q"):
+    exit()
+
 contours, hierarchy = cv2.findContours(new, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 # print(len(contours))
 if contours is None:
@@ -57,36 +61,76 @@ failed = 0
 output_width, output_height = 590, 860
 # top_left, top_right, bottom_right, bottom_left
 output_corners = np.float32([[0, 0], [output_width, 0], [output_width, output_height], [0, output_height]])
-
+black = np.zeros_like(im2, dtype=np.uint8)
 for c in contours:
-    if cv2.contourArea(c) > 1800:#: and pmt.is_rectangle(c)
+    if cv2.contourArea(c) > 3000  :#:and pmt.is_rectangle(c)     np.array([False]).all()
         print("found a rectangle")
-        cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
-        # HL, LR, alpha = cv2.minAreaRect(c)
+        # cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
         # always clockwise starting from the top left tl, tr, br, bl
 
-        box = pmt.find_corner_points(c).astype(np.float32)
+        # MY METHOD
+        box, method = pmt.find_corner_points(c, 0)
         a = 0
-        vertices = cv2.approxPolyDP(c, 0.3 * cv2.arcLength(c, True), True)
-        print(vertices)
+
+        # APPROX METHOD
+        # vertices = cv2.approxPolyDP(c, 0.2 * cv2.arcLength(c, True), True)
+        # print(vertices)
         # vertices.reshape(4, 2)
+
+        # MIN AREA RECT METHOD
+        # minrect = cv2.minAreaRect(c)
+        # minrectpoints = cv2.boxPoints(minrect)
+        # HULL + minrect METHOD
+        hull = cv2.convexHull(c, returnPoints=False) #indexes of the points
+        defects = cv2.convexityDefects(c, hull) #indexes of the points
+        #order defects by length
+        defects = sorted(defects, key=lambda x: (cv2.norm(c[[x[0][1],x[0][0]]], normType= cv2.NORM_L2),x[0][3]  ), reverse=True)
+        # reduce chosens from 4 dimensions to 3
+        chosens = c[hull].squeeze(axis=2)
+        # cv2.drawContours(black, chosens, -1, (255, 255, 255), 3)
+        boolean_mask = np.full(c.shape[0], True, dtype=np.bool_)
+        for defect in defects:
+            s, e, f, d = defect[0]
+            if d < 300:
+                continue
+            # start = tuple(c[s][0])
+            # end = tuple(c[e][0])
+            # delete from start to end and add the new point
+
+            boolean_mask[s+1:e] = False
+        #
+        new_c = c[boolean_mask] #
+        # print(len(boolean_mask),len(c),len(new_c))
+        cv2.drawContours(black, new_c, -1, (255, 255, 255), 3)
+
+
+        box = cv2.minAreaRect(chosens)
+        box = cv2.boxPoints(box)
+        # print(box)
+        if len(box) != 4:
+            continue
+        box.reshape(4, 2)
+
+        if box[1, 0] - box[0, 0] > box[2, 1] - box[1, 1]:
+            # print(box[1, 0] - box[0, 0], box[2, 1] - box[1, 1])
+            box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
+            print("ordering")
         for p in box.astype(np.int32):
-            print(p)
+            # print(p)
             im2 = cv2.circle(im2, p, 5, (a * 63, a * 63, a * 63), -1)
             im2 = cv2.putText(im2, str(a) + str(p), p, cv2.FONT_HERSHEY_SIMPLEX, 1.6, (a * 63, a * 63, a * 63), 6)
             a += 1
 
         # TODO: check if the box is clockwise or not and trasform as needed
+        # if not method:
+        #     if 1:
+        #         1
 
-        if box[1,0] - box[0,0] > box[2,1] - box[1,1]:
-            print(box[1, 0] - box[0, 0], box[2, 1] - box[1, 1])
-            box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
-            print("ordering\n"+str(box))
 
 
         count += 1
-        transformation_matrix = cv2.getPerspectiveTransform(box, output_corners)
-        warped_image = cv2.warpPerspective(img.copy(), transformation_matrix, (output_width, output_height))
+        transformation_matrix = cv2.getPerspectiveTransform(box.astype(np.float32), output_corners)
+        warped_image = cv2.warpPerspective(blur_img.copy(), transformation_matrix, (output_width, output_height))
         x, y = warped_image.shape[:2]
         # name = warped_image[x//16:x//7,y//12:y*33//40]
         name = warped_image[:x // 7, :]
@@ -107,7 +151,7 @@ for c in contours:
         # print("smt wrongobongo")
         failed += 1
 
-
+cv2.imshow("black", cv2.resize(black, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 cv2.imshow("contours", cv2.resize(im2, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 print(f"found {count} cards and {failed} failed")
 # im2 = img.copy()

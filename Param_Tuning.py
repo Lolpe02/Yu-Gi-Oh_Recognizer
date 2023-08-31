@@ -20,28 +20,27 @@ def find_corner_points(contour,method=1):
         # Find the point with the lowest difference of coordinates (bottom-left corner)
         bottom_left = tuple(contour[np.argmax(np.diff(contour, axis=2))])
 
-        return np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.int32).reshape(4, 2)
+        return np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.int32).reshape(4, 2), method
 
     elif not method:
-        top_left = tuple(contour[contour[:, :, 0].argmin()][0])
+        left_most = tuple(contour[contour[:, :, 0].argmin()][0])
 
-        top_right = tuple(contour[contour[:, :, 0].argmax()][0])
+        right_most = tuple(contour[contour[:, :, 0].argmax()][0])
 
-        bottom_right = tuple(contour[contour[:, :, 1].argmin()][0])
+        up_most = tuple(contour[contour[:, :, 1].argmin()][0])
 
-        bottom_left = tuple(contour[contour[:, :, 1].argmax()][0])
+        bottom_most = tuple(contour[contour[:, :, 1].argmax()][0])
 
-        return np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.int32).reshape(4, 2)
+        return np.array([up_most, right_most, bottom_most, left_most], dtype=np.int32).reshape(4, 2), method
 
 def is_rectangle(contour):
     # Calculate contour properties
     perimeter = cv2.arcLength(contour, True)
-    vertices = cv2.approxPolyDP(contour, 0.2 * perimeter, True)
+    vertices = cv2.approxPolyDP(contour, 0.3 * perimeter, True)
 
 
     if len(vertices) != 4:
         return False
-    print(vertices)
     vertices.reshape(4, 2) #tl, tr, br, bl
 
     # calculate distance between two points
@@ -56,27 +55,28 @@ def is_rectangle(contour):
     return aspect_ratio >= card_ratio - 0.2 and aspect_ratio <= card_ratio + 0.2
 
 
-def find_optimal_canny_threshold(im , test = None , threshold_range=(0, 511), step=30):
+def find_optimal_canny_threshold(im , test = 0 , threshold_range=(0, 601), step=30):
     best_threshold1 = None
     best_threshold2 = None
     l = []
     kernel = np.ones((2,2), np.uint8)
     im = cv2.imread(im)
-    image = cv2.cvtColor(im, cv2.COLOR_HSV2BGR)
     # image = cv2.GaussianBlur(cv2.imread(im), (3, 3), 0)
-    # image = cv2.bilateralFilter(image, 5, 10, 10)
+    image = cv2.bilateralFilter(im, 5, 10, 10)
     if test:
-        step = 10
+        step = 15
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         ret, thresh_H = cv2.threshold(hsv[:, :, 0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         ret, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         ret, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         t = thresh_V - thresh_H - thresh_S
-        image = cv2.bitwise_not(t)
+        neg = cv2.bitwise_not(t)
+        stacked = np.dstack((thresh_H, thresh_S, thresh_V))
+        image = cv2.cvtColor(stacked, cv2.COLOR_HSV2BGR)
 
-    for threshold1 in range(threshold_range[0], threshold_range[1] - 1, step):
-        for threshold2 in range(threshold_range[0], threshold_range[1], step*10):
-            edges = cv2.Canny(image, threshold1, threshold2, None, 3, True)
+    for threshold1 in range(threshold_range[0], threshold_range[1] - 1, 3*step):
+        for threshold2 in range(threshold_range[0], threshold_range[1], step):
+            edges = cv2.Canny(image, threshold1, threshold2, None, 3, False)
             edges = cv2.dilate(edges, kernel, iterations=4)
             sedges = cv2.rectangle(edges, (50, 50), (1100, 150), (255, 255, 255), -1, 8)
             sedges = cv2.putText(sedges, f"t1= {threshold1} , t2= {threshold2}", (80, 90),
@@ -105,7 +105,7 @@ def find_optimal_canny_threshold(im , test = None , threshold_range=(0, 511), st
                 continue
 
     return l
-def find_optimal_hsv_threshold(im ,testlist = None , step=15):# []
+def find_optimal_hsv_threshold(im ,testvaluelist = None , step=15):# []
     kernel = np.ones((1, 1), np.uint8)
     l = []
     im = cv2.imread(im)
@@ -113,8 +113,8 @@ def find_optimal_hsv_threshold(im ,testlist = None , step=15):# []
     # im = cv2.GaussianBlur(im, (3, 3), 0)
     im = cv2.bilateralFilter(im, 5, 10, 10)
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
-    if testlist:
-        for test in testlist:
+    if testvaluelist:
+        for test in testvaluelist:
             ret, thresh_H = cv2.threshold(hsv[:, :, 0], test[0], 255, cv2.THRESH_BINARY)
             ret, thresh_S = cv2.threshold(hsv[:, :, 1], test[1], 255, cv2.THRESH_BINARY)
             ret, thresh_V = cv2.threshold(hsv[:, :, 2], test[3], 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -134,7 +134,7 @@ def find_optimal_hsv_threshold(im ,testlist = None , step=15):# []
                 ret, thresh_S = cv2.threshold(hsv[:, :, 1], threshold2, 255, cv2.THRESH_BINARY)
                 ret, thresh_V = cv2.threshold(hsv[:, :, 2], threshold3, 255, cv2.THRESH_BINARY)
                 # --- add the result of the above two ---
-                t = thresh_V + thresh_H + thresh_S
+                t = thresh_V - thresh_H - thresh_S
                 neg = cv2.bitwise_not(t)
                 # --- some morphology operation to clear unwanted spots ---
                 dilation = cv2.dilate(neg, kernel, iterations=5)
@@ -180,7 +180,7 @@ carta5 =[(20, 130), (20, 250), (30, 250), (40, 250), (90, 120), (120, 60), (120,
 carta11 = [ (40, 30), (60, 20), (190, 10)]
 
 if __name__ == '__main__':
-    print(find_optimal_canny_threshold('stacked.jpeg', 0,step=1 ))
+    print(find_optimal_canny_threshold('carta3.jpeg', 1,step=1 ))
     # s = set([(20, 160), (20, 240), (30, 170), (30, 250), (50, 190), (50, 200), (50, 210), (60, 210), (60, 240), (60, 250), (80, 190), (150, 110), (160, 70), (230, 90)(70, 50), (100, 30), (130, 20), (150, 10), (190, 10), (190, 20), (200, 20), (210, 20), (210, 40), (220, 10), (220, 20),(20, 170), (20, 180), (200, 70), (200, 150), (210, 120), (220, 80), (230, 70), (230, 80)])
     # print(s)
 
