@@ -1,10 +1,11 @@
 import cv2
 import numpy as np
-
+import re
 
 def print_points(box, im2):
-    for a, p in enumerate(box.astype(np.int32)):
-        # print(p)
+    box_a = box.reshape(4, 2).astype(np.int32)
+    for a, p in enumerate(box_a):
+        print(p)
         im2 = cv2.circle(im2, p, 3, (a * 63, a * 63, a * 63), -1)
         im2 = cv2.putText(im2, str(a) + str(p), p, cv2.FONT_HERSHEY_SIMPLEX, 1, (a * 63, a * 63, a * 63), 6)
         a += 1
@@ -28,7 +29,7 @@ def pca(box, pt4):
     # Store the center of 4 points
     cntr = (np.mean(pt4, axis=0))
 
-    print(eigenvectors)
+    # print(eigenvectors)
     atan = np.arctan(eigenvectors[1, 0] / eigenvectors[0, 0])
     angle = np.degrees(atan)
     # if box[1, 0] - box[0, 0] > box[2, 1] - box[1, 1]: # if width > height
@@ -71,17 +72,21 @@ def find_corner_points(contour, method=1):
         return None
 
     if method:
+
+        s = np.sum(contour, axis=2)
+        diff = np.diff(contour, axis=-1)
+
         # Find the point with the lowest sum of coordinates (top-left corner)
-        top_left = tuple(contour[np.argmin(contour.sum(axis=2))])
+        top_left = tuple(contour[np.argmin(s)])
 
         # Find the point with the highest difference of coordinates (top-right corner)
-        top_right = tuple(contour[np.argmin(np.diff(contour, axis=2))])
+        top_right = tuple(contour[np.argmin(diff)])
 
         # Find the point with the highest sum of coordinates (bottom-right corner)
-        bottom_right = tuple(contour[np.argmax(contour.sum(axis=2))])
+        bottom_right = tuple(contour[np.argmax(s)])
 
         # Find the point with the lowest difference of coordinates (bottom-left corner)
-        bottom_left = tuple(contour[np.argmax(np.diff(contour, axis=2))])
+        bottom_left = tuple(contour[np.argmax(diff)])
 
         return np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.int32).reshape(4, 2), method
 
@@ -100,16 +105,18 @@ def find_corner_points(contour, method=1):
 def is_rectangle(contour):
     # Calculate contour properties
     perimeter = cv2.arcLength(contour, True)
-    vertices = cv2.approxPolyDP(contour, 0.2 * perimeter, True)
+    vertices = cv2.approxPolyDP(contour, 0.1 * perimeter, True)
 
     # print("done")
     if len(vertices) != 4:
+        print("not 4 vertices")
         return False
     vertices.reshape(4, 2)  # tl, tr, br, bl
 
     # calculate distance between two points
     height1, height2 = cv2.norm(vertices[::2, :], cv2.NORM_L2), cv2.norm(vertices[1::2, :], cv2.NORM_L2)
     width1, width2 = cv2.norm(vertices[:2, :], cv2.NORM_L2), cv2.norm(vertices[3:, :], cv2.NORM_L2)
+    # print(width1/ width2, height1/ height2)
     width, height = (width1 + width2) / 2, (height1 + height2) / 2
 
     card_ratio = 590 / 860
@@ -117,28 +124,28 @@ def is_rectangle(contour):
     aspect_ratio = width / height
     # Check if the contour has 4 vertices and aspect ratio close to 1
 
-    return aspect_ratio >= card_ratio - 0.3 and aspect_ratio <= card_ratio + 0.3
+    return True #aspect_ratio >= card_ratio - 0.3 and aspect_ratio <= card_ratio + 0.3
 
 
 def hsv_thresh(img, kernel):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    ret, thresh_H = cv2.threshold(hsv[:, :, 0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ret, thresh_H = cv2.threshold(hsv[:, :, 0]*2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     ret, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     ret, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     # --- add the result of the above two ---
 
-    t = thresh_H + thresh_S
+    t = thresh_H + thresh_S + thresh_V
     neg = cv2.bitwise_not(t)
 
     # --- some morphology operation to clear unwanted spots ---
     dilation = cv2.dilate(neg, kernel, iterations=4)
-    thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_ERODE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
-    thresh_S = cv2.morphologyEx(thresh_S, cv2.MORPH_CLOSE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
+    # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_ERODE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
+    # thresh_S = cv2.morphologyEx(thresh_S, cv2.MORPH_CLOSE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
 
-    cv2.imshow('h', cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    cv2.imshow('s', cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    cv2.imshow('v', cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow('h', cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow('s', cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow('v', cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
 
 
@@ -157,14 +164,19 @@ def hsv_thresh(img, kernel):
 
     if white_pixel_ratio < 0.4:
         print("white pixel sparsity is too low")
-        return [dilation]
+        return [gray]
 
     # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_CLOSE, kernel, iterations=20)  # erode(thresh_V, kernel, iterations=5)
     stacked = np.dstack((thresh_H, thresh_S, thresh_V))
     rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2BGR)
     r, graystacked = cv2.threshold(cv2.cvtColor(rgbstacked, cv2.COLOR_BGR2GRAY), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    cv2.imshow('graystacked', cv2.resize(graystacked, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow('graystacked', cv2.resize(graystacked, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
     return graystacked, dilation, gray
+
+
+def get_name(result):
+    name = re.sub(r"[-()\"#/@;:*_<£/\n>{}`+=~|.!?,]", "", result).lstrip().rstrip()
+    return name
 
 
 def find_optimal_canny_threshold(im, test=0, threshold_range=(0, 601), step=30):
