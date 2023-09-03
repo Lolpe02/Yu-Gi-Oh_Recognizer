@@ -5,15 +5,21 @@ import re
 def print_points(box, im2):
     box_a = box.reshape(4, 2).astype(np.int32)
     for a, p in enumerate(box_a):
-        # print(p)
+        print(p)
         im2 = cv2.circle(im2, p, 3, (a * 63, a * 63, a * 63), -1)
         im2 = cv2.putText(im2, str(a) + str(p), p, cv2.FONT_HERSHEY_SIMPLEX, 1, (a * 63, a * 63, a * 63), 6)
         a += 1
 
+def is_rectangle(contour):
+    perimeter = cv2.arcLength(contour, True)
+    vertices = cv2.approxPolyDP(contour, 0.1 * perimeter, True)
+    return len(vertices) == 4
+
 def order(w, h , pts):
+    print(w, h)
     tl, tr, br, bl = find_corner_points(pts)[0]
     temp_rect = np.zeros((4, 2), dtype="float32")
-    pts = pts.reshape(-1,1, 2)
+    pts = pts.reshape(-1, 1, 2)
     if w <= 0.8 * h:  # If card is vertically oriented
         temp_rect[0] = tl
         temp_rect[1] = tr
@@ -51,60 +57,6 @@ def order(w, h , pts):
             temp_rect[2] = pts[2][0]  # Bottom right
             temp_rect[3] = pts[1][0]  # Bottom left
     return temp_rect
-def pca(box, pt4):
-    # tl, tr, br, bl = box
-    # x, y, alpha = cv2.minAreaRect(box)
-    ## [pca]
-    # Construct a buffer used by the pca analysis
-    sz = len(box)
-    data_pts = np.empty((sz, 2), dtype=np.float32)
-    for i in range(data_pts.shape[0]):
-        data_pts[i, 0] = box[i, 0, 0]
-        data_pts[i, 1] = box[i, 0, 1]
-
-    # Perform PCA analysis
-    mean = np.empty((0))
-    mean, eigenvectors, eigenvalues = cv2.PCACompute2(data_pts, mean)
-
-    # Store the center of 4 points
-    cntr = (np.mean(pt4, axis=0))
-
-    # print(eigenvectors)
-    atan = np.arctan(eigenvectors[1, 0] / eigenvectors[0, 0])
-    angle = np.degrees(atan)
-    # if box[1, 0] - box[0, 0] > box[2, 1] - box[1, 1]: # if width > height
-    #
-    #     # print(box[1, 0] - box[0, 0], box[2, 1] - box[1, 1])
-    #     box = np.array([box[3], box[0], box[1], box[2]], dtype=np.float32)
-    #     print("ordering")
-    # # detect if rectangle is left or right oriented
-    # if pts[0][0] < pts[1][0]:
-    #     left = pts[0]
-    #     right = pts[1]  # right
-    # else:
-    #     left = pts[1]
-    #     right = pts[0]
-    # if pts[2][0] < pts[3][0]:
-    #     left2 = pts[2]
-    #     right2 = pts[3]
-    # else:
-    #     left2 = pts[3]
-    #     right2 = pts[2]
-    # # detect if rectangle is up or down oriented
-    # if pts[0][1] < pts[2][1]:
-    #     up = pts[0]
-    #     down = pts[2]
-    # else:
-    #     up = pts[2]
-    #     down = pts[0]
-    # if pts[1][1] < pts[3][1]:
-    #     up2 = pts[1]
-    #     down2 = pts[3]
-    # else:
-    #     up2 = pts[3]
-    #     down2 = pts[1]
-    return cntr, angle
-
 
 def find_corner_points(contour, method=1):
     if len(contour) < 4:
@@ -112,7 +64,6 @@ def find_corner_points(contour, method=1):
         return None
     contour = contour.reshape(-1, 1, 2)
     if method:
-
         s = np.sum(contour, axis=2)
         diff = np.diff(contour, axis=-1)
 
@@ -141,82 +92,23 @@ def find_corner_points(contour, method=1):
 
         return np.array([up_most, right_most, bottom_most, left_most], dtype=np.int32).reshape(4, 2), method
 
-
-def is_rectangle(contour):
-    # Calculate contour properties
-    perimeter = cv2.arcLength(contour, True)
-    vertices = cv2.approxPolyDP(contour, 0.07 * perimeter, True)
-
-    # print("done")
-    if len(vertices) != 4:
-        print("not 4 vertices")
-        return False
-    vertices.reshape(4, 2)  # tl, tr, br, bl
-
-    # calculate distance between two points
-    height1, height2 = cv2.norm(vertices[::2, :], cv2.NORM_L2), cv2.norm(vertices[1::2, :], cv2.NORM_L2)
-    width1, width2 = cv2.norm(vertices[:2, :], cv2.NORM_L2), cv2.norm(vertices[3:, :], cv2.NORM_L2)
-    # print(width1/ width2, height1/ height2)
-    width, height = (width1 + width2) / 2, (height1 + height2) / 2
-
-    card_ratio = 590 / 860
-    print(card_ratio, width / height)
-    # Calculate aspect ratio of the bounding rectangle
-    aspect_ratio = width / height
-    # Check if the contour has 4 vertices and aspect ratio close to 1
-
-    return aspect_ratio >= card_ratio - 0.2 and aspect_ratio <= card_ratio + 0.2
-
-
 def hsv_thresh(img, kernel):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    ret, thresh_H = cv2.threshold(hsv[:, :, 0]*2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    ret, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    ret, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # --- add the result of the above two ---
+    _, thresh_H = cv2.threshold(hsv[:, :, 0] * 2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    _, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    _, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    t = thresh_H + thresh_S + thresh_V
-    neg = cv2.bitwise_not(t)
-
-    # --- some morphology operation to clear unwanted spots ---
+    neg = cv2.bitwise_not(thresh_H + thresh_S + thresh_V)
     dilation = cv2.dilate(neg, kernel, iterations=4)
-    # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_ERODE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
-    # thresh_S = cv2.morphologyEx(thresh_S, cv2.MORPH_CLOSE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
 
-    cv2.imshow('h', cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    cv2.imshow('s', cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    cv2.imshow('v', cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-
-
-
-    # calculate histogram of black and white pixels
-    # hist = cv2.calcHist([thresh_V], [0], None, [2], [0, 256])
-    # _, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_V, connectivity=4)
-    total_pixels = thresh_V.shape[0] * thresh_V.shape[1]
-
-    # Calculate the number of white pixels (pixels with a value of 255)
-    white_pixels = np.sum(thresh_V == 255)
-    # cv2.imshow("lables",cv2.resize(np.uint8(255 * (labels+50) / np.max(labels)), None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC ))
-
-    # Calculate the sparsity of white pixels
-    white_pixel_ratio = white_pixels / total_pixels
-    # print(hist, white_pixels, "\n", len(stats), "\n", len(centroids))
-
-    # if white_pixel_ratio < 0.6:
-    #     print("white pixel sparsity is too low")
-    #     return [gray]
-
-    # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_CLOSE, kernel, iterations=20)  # erode(thresh_V, kernel, iterations=5)
-    stacked = np.dstack((thresh_H, thresh_S, thresh_V))
-    rgbstacked = cv2.cvtColor(stacked, cv2.COLOR_HSV2BGR)
-    r, graystacked = cv2.threshold(cv2.cvtColor(rgbstacked, cv2.COLOR_BGR2GRAY), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    # cv2.imshow('graystacked', cv2.resize(graystacked, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    thresh_rgb = cv2.cvtColor(np.dstack((thresh_H, thresh_S, thresh_V)), cv2.COLOR_HSV2BGR)
+    r, graystacked = cv2.threshold(cv2.cvtColor(thresh_rgb, cv2.COLOR_BGR2GRAY), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     return graystacked, dilation, gray
 
 
 def get_name(result):
-    name = re.sub(r"[-()\"#/@—;:*_<£/\n>{}`+=~|.!?,]", "", result).lstrip().rstrip()
+    name = re.sub(r"[()\"#/@;:*_<£/\n>{}`+=~|.!?,]", "", result).lstrip().rstrip()
     return name
 
 
@@ -226,7 +118,6 @@ def find_optimal_canny_threshold(im, test=0, threshold_range=(0, 601), step=30):
     l = []
     kernel = np.ones((2, 2), np.uint8)
     im = cv2.imread(im)
-    # image = cv2.GaussianBlur(cv2.imread(im), (3, 3), 0)
     image = cv2.bilateralFilter(im, 5, 10, 10)
     if test:
         step = 15
@@ -278,7 +169,6 @@ def find_optimal_hsv_threshold(im, testvaluelist=None, step=15):  # []
     l = []
     im = cv2.imread(im)
     area1 = np.multiply(*im.shape[:2]) - 1
-    # im = cv2.GaussianBlur(im, (3, 3), 0)
     im = cv2.bilateralFilter(im, 5, 10, 10)
     hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
     if testvaluelist:
@@ -342,13 +232,3 @@ def find_optimal_hsv_threshold(im, testvaluelist=None, step=15):  # []
                     continue
 
     return l
-
-
-carta5 = [(20, 130), (20, 250), (30, 250), (40, 250), (90, 120), (120, 60), (120, 120), (130, 60), (200, 70),
-          (200, 120), (220, 70), (220, 100), (250, 70)]
-carta11 = [(40, 30), (60, 20), (190, 10)]
-
-if __name__ == '__main__':
-    print(find_optimal_canny_threshold('cards/carta3.jpeg', 1, step=1))
-    # s = set([(20, 160), (20, 240), (30, 170), (30, 250), (50, 190), (50, 200), (50, 210), (60, 210), (60, 240), (60, 250), (80, 190), (150, 110), (160, 70), (230, 90)(70, 50), (100, 30), (130, 20), (150, 10), (190, 10), (190, 20), (200, 20), (210, 20), (210, 40), (220, 10), (220, 20),(20, 170), (20, 180), (200, 70), (200, 150), (210, 120), (220, 80), (230, 70), (230, 80)])
-    # print(s)
