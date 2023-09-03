@@ -5,12 +5,52 @@ import re
 def print_points(box, im2):
     box_a = box.reshape(4, 2).astype(np.int32)
     for a, p in enumerate(box_a):
-        print(p)
+        # print(p)
         im2 = cv2.circle(im2, p, 3, (a * 63, a * 63, a * 63), -1)
         im2 = cv2.putText(im2, str(a) + str(p), p, cv2.FONT_HERSHEY_SIMPLEX, 1, (a * 63, a * 63, a * 63), 6)
         a += 1
 
+def order(w, h , pts):
+    tl, tr, br, bl = find_corner_points(pts)[0]
+    temp_rect = np.zeros((4, 2), dtype="float32")
+    pts = pts.reshape(-1,1, 2)
+    if w <= 0.8 * h:  # If card is vertically oriented
+        temp_rect[0] = tl
+        temp_rect[1] = tr
+        temp_rect[2] = br
+        temp_rect[3] = bl
 
+    if w >= 1.2 * h:  # If card is horizontally oriented
+        temp_rect[0] = bl
+        temp_rect[1] = tl
+        temp_rect[2] = tr
+        temp_rect[3] = br
+
+        # If the card is 'diamond' oriented, a different algorithm
+        # has to be used to identify which point is top left, top right
+        # bottom left, and bottom right.
+
+    if w > 0.8 * h and w < 1.2 * h:  # If card is diamond oriented
+        # If furthest left point is higher than furthest right point,
+        # card is tilted to the left.
+        if pts[1][0][1] <= pts[3][0][1]:
+            # If card is titled to the left, approxPolyDP returns points
+            # in this order: top right, top left, bottom left, bottom right
+            temp_rect[0] = pts[1][0]  # Top left
+            temp_rect[1] = pts[0][0]  # Top right
+            temp_rect[2] = pts[3][0]  # Bottom right
+            temp_rect[3] = pts[2][0]  # Bottom left
+
+        # If furthest left point is lower than furthest right point,
+        # card is tilted to the right
+        if pts[1][0][1] > pts[3][0][1]:
+            # If card is titled to the right, approxPolyDP returns points
+            # in this order: top left, bottom left, bottom right, top right
+            temp_rect[0] = pts[0][0]  # Top left
+            temp_rect[1] = pts[3][0]  # Top right
+            temp_rect[2] = pts[2][0]  # Bottom right
+            temp_rect[3] = pts[1][0]  # Bottom left
+    return temp_rect
 def pca(box, pt4):
     # tl, tr, br, bl = box
     # x, y, alpha = cv2.minAreaRect(box)
@@ -70,7 +110,7 @@ def find_corner_points(contour, method=1):
     if len(contour) < 4:
         print("not enough points")
         return None
-
+    contour = contour.reshape(-1, 1, 2)
     if method:
 
         s = np.sum(contour, axis=2)
@@ -105,7 +145,7 @@ def find_corner_points(contour, method=1):
 def is_rectangle(contour):
     # Calculate contour properties
     perimeter = cv2.arcLength(contour, True)
-    vertices = cv2.approxPolyDP(contour, 0.1 * perimeter, True)
+    vertices = cv2.approxPolyDP(contour, 0.07 * perimeter, True)
 
     # print("done")
     if len(vertices) != 4:
@@ -120,11 +160,12 @@ def is_rectangle(contour):
     width, height = (width1 + width2) / 2, (height1 + height2) / 2
 
     card_ratio = 590 / 860
+    print(card_ratio, width / height)
     # Calculate aspect ratio of the bounding rectangle
     aspect_ratio = width / height
     # Check if the contour has 4 vertices and aspect ratio close to 1
 
-    return True #aspect_ratio >= card_ratio - 0.3 and aspect_ratio <= card_ratio + 0.3
+    return aspect_ratio >= card_ratio - 0.2 and aspect_ratio <= card_ratio + 0.2
 
 
 def hsv_thresh(img, kernel):
@@ -143,15 +184,15 @@ def hsv_thresh(img, kernel):
     # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_ERODE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
     # thresh_S = cv2.morphologyEx(thresh_S, cv2.MORPH_CLOSE, kernel, iterations=10)  # erode(thresh_V, kernel, iterations=5)
 
-    # cv2.imshow('h', cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    # cv2.imshow('s', cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-    # cv2.imshow('v', cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    cv2.imshow('h', cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    cv2.imshow('s', cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    cv2.imshow('v', cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
 
 
     # calculate histogram of black and white pixels
-    hist = cv2.calcHist([thresh_V], [0], None, [2], [0, 256])
-    _, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_V, connectivity=4)
+    # hist = cv2.calcHist([thresh_V], [0], None, [2], [0, 256])
+    # _, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_V, connectivity=4)
     total_pixels = thresh_V.shape[0] * thresh_V.shape[1]
 
     # Calculate the number of white pixels (pixels with a value of 255)
@@ -162,9 +203,9 @@ def hsv_thresh(img, kernel):
     white_pixel_ratio = white_pixels / total_pixels
     # print(hist, white_pixels, "\n", len(stats), "\n", len(centroids))
 
-    if white_pixel_ratio < 0.4:
-        print("white pixel sparsity is too low")
-        return [gray]
+    # if white_pixel_ratio < 0.6:
+    #     print("white pixel sparsity is too low")
+    #     return [gray]
 
     # thresh_V = cv2.morphologyEx(thresh_V, cv2.MORPH_CLOSE, kernel, iterations=20)  # erode(thresh_V, kernel, iterations=5)
     stacked = np.dstack((thresh_H, thresh_S, thresh_V))
@@ -175,7 +216,7 @@ def hsv_thresh(img, kernel):
 
 
 def get_name(result):
-    name = re.sub(r"[-()\"#/@;:*_<£/\n>{}`+=~|.!?,]", "", result).lstrip().rstrip()
+    name = re.sub(r"[-()\"#/@—;:*_<£/\n>{}`+=~|.!?,]", "", result).lstrip().rstrip()
     return name
 
 
@@ -308,6 +349,6 @@ carta5 = [(20, 130), (20, 250), (30, 250), (40, 250), (90, 120), (120, 60), (120
 carta11 = [(40, 30), (60, 20), (190, 10)]
 
 if __name__ == '__main__':
-    print(find_optimal_canny_threshold('carta3.jpeg', 1, step=1))
+    print(find_optimal_canny_threshold('cards/carta3.jpeg', 1, step=1))
     # s = set([(20, 160), (20, 240), (30, 170), (30, 250), (50, 190), (50, 200), (50, 210), (60, 210), (60, 240), (60, 250), (80, 190), (150, 110), (160, 70), (230, 90)(70, 50), (100, 30), (130, 20), (150, 10), (190, 10), (190, 20), (200, 20), (210, 20), (210, 40), (220, 10), (220, 20),(20, 170), (20, 180), (200, 70), (200, 150), (210, 120), (220, 80), (230, 70), (230, 80)])
     # print(s)

@@ -13,15 +13,18 @@ pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 # print(pt.get_languages())
 namelist = []
 kernel = np.ones((2,2), np.uint8)
-img = cv2.imread('cards/carta12.jpeg')
+img = cv2.imread('cards/carta3.jpeg')
+#invert vertically
+# img = img[::-1,::-1] # inverted img
 blur_img = cv2.bilateralFilter(img, 9, 10, 10)
 # print(img.shape)
 
 
 # img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
 # img = cv2.GaussianBlur(img, (3, 3), 0.1)
+lato = max([(130,135,157), (67,70,87), (73,77,89), (46,46,56), (114,116,124), (61,62,74), (32,35,50), (129,139,153), (131,142,180), (20,20,35), (87,102,137)])
 
-
+last_resort = cv2.inRange(blur_img, (10,10,10), (131,142,177))
 
 processed = pmt.hsv_thresh(blur_img, kernel)[0]
 canny = cv2.Canny(processed,60,300)   #[(0, 480), (30, 480), (120, 150), (120, 450), (140, 481)]
@@ -30,13 +33,14 @@ canny = cv2.Canny(processed,60,300)   #[(0, 480), (30, 480), (120, 150), (120, 4
 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
 new= cv2.morphologyEx(canny, cv2.MORPH_CROSS, kernel, iterations=3)
 
-# cv2.imshow("canny", cv2.resize(new, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+cv2.imshow("last_resort", cv2.resize(last_resort, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+cv2.imshow("canny", cv2.resize(new, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 # cv2.imshow("processed", cv2.resize(cv2.bitwise_not(processed) , None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-# test = cv2.waitKey(0) & 0xFF
-# if test == ord("q"):
+# k = cv2.waitKey(0) & 0xFF
+# if k == ord("q"):
 #     exit()
 
-contours, hierarchy = cv2.findContours(cv2.bitwise_not(processed), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+contours, hierarchy = cv2.findContours(new, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 # print(len(contours))
 if contours is None:
     print("no contours found")
@@ -51,7 +55,7 @@ output_corners = np.float32([[0, 0], [output_width, 0], [output_width, output_he
 black = np.zeros_like(im2, dtype=np.uint8)
 
 for c in contours:
-    if cv2.contourArea(c) > 2000   and  pmt.is_rectangle(c) :#:  np.array([False]).all()
+    if cv2.contourArea(c) > 4000   and  pmt.is_rectangle(c) : #
         # print("found a rectangle")
         cv2.drawContours(im2, [c], -1, (0, 255, 0), 2)
         # always clockwise starting from the top left tl, tr, br, bl
@@ -65,7 +69,7 @@ for c in contours:
         if len(box) != 4:
             continue
         # box = pmt.find_corner_points(box)[0]
-        # print(box)
+        print(box.shape)
 
 
         # MIN AREA RECT METHOD
@@ -105,23 +109,32 @@ for c in contours:
         # if the first point is on the left of the second point
 
         pmt.print_points(box, im2)
-        print(box.shape)
+        # print(box.shape)
         # find longest side
-        if cv2.norm(box[0], box[1], normType=cv2.NORM_L2) > cv2.norm(box[0], box[3], normType=cv2.NORM_L2):
-            angle = np.arctan((box[1][1] - box[0][1]) / (box[1][0] - box[0][0]))
-        else:
-            angle = np.arctan((box[3][1] - box[0][1]) / (box[3][0] - box[0][0]))
-        # print(angle)
+        x,y, w, h = cv2.boundingRect(c)
+        newbox = pmt.order(w,h, box)
+        # distance01 =cv2.norm(box[0], box[1], normType=cv2.NORM_L2)
+        # distance03 = cv2.norm(box[0], box[3], normType=cv2.NORM_L2)
+        # if distance01 > distance03:
+        #     short_side = distance03
+        #     long_side = distance01
+        #     angle = np.arctan((box[1][1] - box[0][1]) / (box[1][0] - box[0][0]))
+        # else:
+        #     short_side = distance01
+        #     long_side = distance03
+        #     angle = np.arctan((box[3][1] - box[0][1]) / (box[3][0] - box[0][0]))
+        # if distance01   / distance03 <0.7:
+        #     box = np.roll(box, -2, axis=0)
 
 
         # TODO: check if the box is clockwise or not and trasform as needed
-        if angle < 0:
-            # print("destra?")
-            box = np.array([box[0], box[3], box[2], box[1]])
-        else :
-            # print("sinistra?")
-            box = np.roll(box, -1, axis=0)
-            box = np.array([box[0], box[3], box[2], box[1]])
+        # if angle < 0:
+        #     print("destra?")
+        #     box = np.array([box[0], box[3], box[2], box[1]])
+        # else :
+        #     print("sinistra?")
+        #     box = np.roll(box, -1, axis=0)
+        #     box = np.array([box[0], box[3], box[2], box[1]])
         count += 1
 
         # affine transformation
@@ -129,24 +142,24 @@ for c in contours:
         # warped_image = cv2.warpAffine(blur_img.copy(), mat, (output_width*2, output_height*2))
 
         # perspective transformation
-        transformation_matrix = cv2.getPerspectiveTransform(box.astype(np.float32), output_corners)
+        transformation_matrix = cv2.getPerspectiveTransform(newbox.astype(np.float32), output_corners)
         warped_image = cv2.warpPerspective(blur_img.copy(), transformation_matrix, (output_width, output_height))
 
         x, y = warped_image.shape[:2]
 
         # name = warped_image[x//16:x//7
-        name = warped_image[:x // 7,:y-y//10]
+        name = warped_image[:x // 7,y//20:y-y//5]
 
-        loaded_kmeans = joblib.load('kmeans_model.pkl')
-        centers = loaded_kmeans.cluster_centers_.astype(np.uint8)
-        print(centers)
-        segmented = centers[loaded_kmeans.predict(cv2.cvtColor(name, cv2.COLOR_BGR2HSV).reshape(-1, 3))]
-        test = cv2.cvtColor(cv2.cvtColor(segmented.reshape(*name.shape), cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
+        # loaded_kmeans = joblib.load('kmeans_model.pkl')
+        # centers = loaded_kmeans.cluster_centers_.astype(np.uint8)
+        # # print(centers)
+        # segmented = centers[loaded_kmeans.predict(cv2.cvtColor(name, cv2.COLOR_BGR2HSV).reshape(-1, 3))]
+        # test = cv2.cvtColor(cv2.cvtColor(segmented.reshape(*name.shape), cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
 
         # sharpening
         blurredn = cv2.bilateralFilter(name, 9, 5, 5)
 
-        # grayn = cv2.cvtColor(blurredn, cv2.COLOR_BGR2GRAY)
+        grayn = cv2.resize(cv2.cvtColor(blurredn, cv2.COLOR_BGR2GRAY), None, fx=0.8, fy=0.8, interpolation=cv2.INTER_CUBIC)
         hsvn = cv2.cvtColor(blurredn, cv2.COLOR_BGR2HSV)
 
         # thresh_h = cv2.adaptiveThreshold(hsvn[:,:,0]*2, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 5, 1)
@@ -169,40 +182,23 @@ for c in contours:
         # newkernel= np.ones((2,2), np.uint8)
         # test = cv2.morphologyEx(test, cv2.MORPH_CLOSE, newkernel, iterations=1)
 
-        cv2.imshow(f"h {count}", test)
+        # cv2.imshow(f"h {count}", grayn)
 
-        text = pt.image_to_string(test, lang='ita', )
+        text = pt.image_to_string(grayn, lang='ita', )
         namelist.append(pmt.get_name(text))
 
-        # cv2.imshow(f"sname of {count}", cv2.resize(s, None, fx=1, fy=1, interpolation=cv2.INTER_CUBIC))
-        # cv2.imshow(f"name of {count}", cv2.resize(name, None, fx=1, fy=1, interpolation=cv2.INTER_CUBIC))
+        cv2.imshow(f"sname of {count}", cv2.resize(grayn, None, fx=1, fy=1, interpolation=cv2.INTER_CUBIC))
+        # cv2.imshow(f"name of {count}", cv2.resize(warped_image, None, fx=1, fy=1, interpolation=cv2.INTER_CUBIC))
 
     else:
-        # cv2.drawContours(im2, [c], -1, (0,0,255), 8)
-        # print("smt wrongobongo")
         failed += 1
 
 # cv2.imshow("black", cv2.resize(black, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
-# cv2.imshow("contours", cv2.resize(im2, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+cv2.imshow("contours", cv2.resize(im2, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 print(f"found {count} cards and {failed} failed")
+#filter out empty strings
+namelist = list(filter(None, namelist))
 print(namelist)
-# im2 = img.copy()
-# lines = cv2.HoughLines(edges, 1, np.pi/180, 100)
-# for line in lines:
-#     rho,theta = line[0]
-#     a = np.cos(theta)
-#     b = np.sin(theta)
-#     x0 = a*rho
-#     y0 = b*rho
-#     x1 = int(x0 + 1000*(-b))
-#     y1 = int(y0 + 1000*(a))
-#     x2 = int(x0 - 1000*(-b))
-#     y2 = int(y0 - 1000*(a))
-#     print((x1, y1), (x2, y2))
-#     cv2.line(im2,(x1,y1),(x2,y2),(0,0,255),2)
-# cv2.imshow('cards_output', im2)
-# cv2.waitKey(0)
-# print(np.linspace(-1,11))
 
 # img = img[::-1,::-1] # inverted img
 # cv2.namedWindow("Img", cv2.WINDOW_KEEPRATIO)
