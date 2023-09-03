@@ -113,8 +113,6 @@ def get_name(result):
 
 
 def find_optimal_canny_threshold(im, test=0, threshold_range=(0, 601), step=30):
-    best_threshold1 = None
-    best_threshold2 = None
     l = []
     kernel = np.ones((2, 2), np.uint8)
     im = cv2.imread(im)
@@ -230,5 +228,4 @@ def find_optimal_hsv_threshold(im, testvaluelist=None, step=15):  # []
                 else:
 
                     continue
-
     return l
