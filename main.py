@@ -2,12 +2,13 @@ import cv2
 import pytesseract as pt
 import numpy as np
 import Param_Tuning as pmt
+import joblib
 import os
 
 pt.pytesseract.tesseract_cmd = r'D:\Program Files\TesseractOCR\tesseract.exe'
 namelist = []
 kernel = np.ones((2,2), np.uint8)
-img = cv2.imread('cards/carta6.jpeg')
+img = cv2.imread('cards/carta12.jpeg')
 # vert = -1.56
 blur_img = cv2.bilateralFilter(img, 9, 10, 10)
 processed = pmt.hsv_thresh(blur_img, kernel)[0]
@@ -19,7 +20,7 @@ processed = pmt.hsv_thresh(blur_img, kernel)[0]
 #         if img is not None:
 #             continue
 
-# cv2.imshow("processed", cv2.resize(processed, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+cv2.imshow("processed", cv2.resize(processed, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
 
 canny = cv2.Canny(processed, 60, 300)
 cv2.imshow("canny", cv2.resize(canny, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
@@ -82,24 +83,25 @@ for c in contours:
         x, y = warped_image.shape[:2]
         name = warped_image[:x // 7,y//20:y-y//5]
 
-        # loaded_kmeans = joblib.load('kmeans_model.pkl')
+        loaded_kmeans = joblib.load('kmeans_model.pkl')
+        mod = 1
         # centers = loaded_kmeans.cluster_centers_.astype(np.uint8)
-        # segmented = centers[loaded_kmeans.predict(cv2.cvtColor(name, cv2.COLOR_BGR2HSV).reshape(-1, 3))]
-        # test = cv2.cvtColor(cv2.cvtColor(segmented.reshape(*name.shape), cv2.COLOR_HSV2BGR), cv2.COLOR_BGR2GRAY)
-
-        # sharpening 5x5 kernel
-        k = np.array([[-1, -1, -1, -1, -1],
-                      [-1, 2, 2, 2, -1],
-                      [-1, 2, 8, 2, -1],
-                      [-1, 2, 2, 2, -1],
-                      [-1, -1, -1, -1, -1]]) / 8.0
-
-
-        blurredn = cv2.filter2D(name, -1, k)
+        c_list = [(0, 0, 0), (58, 60, 74), (230, 227, 226), (27, 156, 139), (175, 53, 130), (138, 71, 188), (91, 121, 174),
+             (186, 149, 84), (171, 104, 75)] #sorted(, key= lambda x : sum(x)/3)
+        if mod : # HSV
+            a = cv2.cvtColor(np.asarray(c_list, dtype=np.uint8).reshape(-1, 1, 3), cv2.COLOR_BGR2HSV)
+            predicted = loaded_kmeans[mod].predict(cv2.cvtColor(name, cv2.COLOR_BGR2HSV).reshape(-1, 3))
+            segmented = a[predicted]
+            test = cv2.cvtColor(segmented.reshape(*name.shape), cv2.COLOR_HSV2BGR)  #
+        elif not mod: # RGB
+            a = np.asarray(c_list, dtype=np.uint8).reshape(-1, 1, 3)
+            predicted = loaded_kmeans[mod].predict(name.reshape(-1, 3))
+            segmented = a[predicted]
+            test = segmented.reshape(*name.shape)
 
         # grayn = cv2.resize(cv2.cvtColor(blurredn, cv2.COLOR_BGR2GRAY), None, fx=0.8, fy=0.8, interpolation=cv2.INTER_CUBIC)
-        hsvn = cv2.cvtColor(blurredn, cv2.COLOR_BGR2HSV)
-        _, test = cv2.threshold(hsvn[:,:,2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # hsvn = cv2.cvtColor(name, cv2.COLOR_BGR2HSV)
+        # _, test = cv2.threshold(hsvn[:,:,2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         # cv2.imshow(f"v of {count}", cv2.resize(hsvn[:,:,2], None, fx=1, fy=1, interpolation=cv2.INTER_CUBIC))
 
         text = pt.image_to_string(test, lang='ita', )

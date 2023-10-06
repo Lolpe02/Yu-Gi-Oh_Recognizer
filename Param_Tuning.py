@@ -64,7 +64,7 @@ def order(w, h , pts, angle):
 
 def find_corner_points(contour, method=1):
     if len(contour) < 4:
-        print("not enough points")
+        # print("not enough points")
         return None
     contour = contour.reshape(-1, 1, 2)
     if method:
@@ -126,10 +126,12 @@ def is_rectangle(contour):
 def hsv_thresh(img, kernel):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    _, thresh_H = cv2.threshold(hsv[:, :, 0] * 2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    _, thresh_H = cv2.threshold(hsv[:, :, 0], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     _, thresh_S = cv2.threshold(hsv[:, :, 1], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     _, thresh_V = cv2.threshold(hsv[:, :, 2], 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
+    # cv2.imshow("thresh_H", cv2.resize(thresh_H, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow("thresh_S", cv2.resize(thresh_S, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
+    # cv2.imshow("thresh_V", cv2.resize(thresh_V, None, fx=0.4, fy=0.4, interpolation=cv2.INTER_CUBIC))
     neg = cv2.bitwise_not(thresh_H + thresh_S + thresh_V)
     dilation = cv2.dilate(neg, kernel, iterations=4)
 
